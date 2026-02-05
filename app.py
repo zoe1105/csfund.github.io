@@ -34,7 +34,7 @@ import re
 import zipfile
 from typing import Dict, Iterable, List, Optional, Tuple
 
-from flask import Flask, abort, jsonify, request, send_from_directory, send_file
+from flask import Flask, jsonify, request, send_from_directory, send_file
 from docx import Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -687,12 +687,23 @@ def api_generate():
     - 在 Vercel 这类无状态函数环境中，把文件写到项目目录再用 /download 二次下载不可靠。
     - 因此这里改为：一次请求内完成生成，并直接把 zip 作为响应返回。
     """
-    payload = request.get_json(force=True, silent=False) or {}
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"ok": False, "error": "请求体必须是 JSON 对象"}), 400
 
     product_type = payload.get("product_type", "__root__")
-    values_raw = payload.get("values", {}) or {}
+    values_raw = payload.get("values", {})
+    if values_raw is None:
+        values_raw = {}
+    if not isinstance(values_raw, dict):
+        return jsonify({"ok": False, "error": "values 必须是对象"}), 400
+
     mode = payload.get("mode", "all")  # all / selected
-    selected = payload.get("selected_templates", []) or []
+    selected = payload.get("selected_templates", [])
+    if selected is None:
+        selected = []
+    if not isinstance(selected, list):
+        return jsonify({"ok": False, "error": "selected_templates 必须是数组"}), 400
     blank_unfilled = bool(payload.get("blank_unfilled", True))
 
     try:
